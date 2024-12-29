@@ -1,60 +1,172 @@
+using System;
 using System.Collections.Generic;
 
-
-public class Monom {
+public class Monom : IComparable<Monom>
+{
     double coefficient;
-    List<int> powers;
+    List<(char, int)> powers;
 
-    public Monom(double c, List<int> p){
+    public double Coefficient
+    {
+        get { return this.coefficient; }
+    }
+
+    public Monom(double c, List<(char, int)> p)
+    {
         this.coefficient = c;
         this.powers = p;
     }
 
-    public static Monom operator *(Monom A, Monom B) {
-        List<int> p = new List<int>();
-        int max_len = Utils.Max(A.powers.Count, B.powers.Count);
+    public Monom(double s, List<int> p, char c)
+    {
+        this.coefficient = s;
+        this.powers = new List<(char, int)>(p.Count);
 
-        for(int i = 0; i < max_len; i++) {
-            int a = 0;
-
-            if (A.powers.Count > i)
-                a += A.powers[i];
-            if (B.powers.Count > i)
-                a += B.powers[i];
-
-            p.Add(a);
-
-        }
-
-        return new Monom(A.coefficient * B.coefficient, p);
+        foreach (int a in p)
+            powers.Add((c, a));
     }
 
-    private void cleanup() {
-        for(int i = 0; i < this.powers.Count; i++){
-            if (this.powers[i] == 0)
+    public Monom(double s, List<int> p)
+        : this(s, p, 'x') { }
+
+    public Monom(double s)
+        : this(s, [], 'x') { }
+
+    public static Monom operator *(Monom A, Monom B)
+    {
+        List<(char, int)> p = new List<(char, int)>();
+
+        if (A.powers.Count == 0 || B.powers.Count == 0)
+        {
+            if (A.powers.Count == 0)
+                return new Monom(A.coefficient * B.coefficient, B.powers).cleanup();
+            if (B.powers.Count == 0)
+                return new Monom(A.coefficient * B.coefficient, A.powers).cleanup();
+        }
+
+        foreach ((char, int) a in A.powers)
+        foreach ((char, int) b in B.powers)
+            if (a.Item1 == b.Item1)
+                p.Add((a.Item1, a.Item2 + b.Item2));
+
+        return new Monom(A.coefficient * B.coefficient, p).cleanup();
+    }
+
+    public static Monom operator +(Monom A, Monom B)
+    {
+        if (A != B)
+            throw new Exception();
+
+        List<(char, int)> l = new List<(char, int)>();
+        foreach ((char, int) a in A.powers)
+        foreach ((char, int) b in B.powers)
+            if (a.Item1 == b.Item1)
+                l.Add((a.Item1, a.Item2));
+
+        return new Monom(A.coefficient + B.coefficient, l).cleanup();
+    }
+
+    public Monom cleanup()
+    {
+        for (int i = 0; i < this.powers.Count; i++)
+        {
+            if (this.powers[i].Item2 == 0)
                 this.powers.RemoveAt(i);
         }
+
+        this.powers.Sort(
+            ((char, int) item1, (char, int) item2) => item1.Item1.CompareTo(item2.Item1)
+        );
+
+        int j = 0;
+        while (j + 1 < this.powers.Count)
+        {
+            if (this.powers[j].Item1 == this.powers[j + 1].Item1)
+            {
+                this.powers[j] = (
+                    this.powers[j].Item1,
+                    this.powers[j].Item2 + this.powers[j + 1].Item2
+                );
+                this.powers.RemoveAt(j + 1);
+            }
+        }
+
+        for (int i = 0; i < this.powers.Count; i++)
+        {
+            if (this.powers[i].Item2 == 0)
+                this.powers.RemoveAt(i);
+        }
+
+        return this;
     }
 
-    public override string ToString(){
+    public static bool operator <(Monom A, Monom B)
+    {
+        foreach ((char, int) a in A.powers)
+        foreach ((char, int) b in B.powers)
+            if (a.Item1 == b.Item1 && a.Item2 != b.Item2)
+                return a.Item2 < b.Item2;
+
+        return A.powers.Count < B.powers.Count;
+    }
+
+    public static bool operator >(Monom A, Monom B)
+    {
+        if (A == B)
+            return false;
+
+        return !(A < B);
+    }
+
+    public static bool operator ==(Monom A, Monom B)
+    {
+        foreach ((char, int) a in A.powers)
+        foreach ((char, int) b in B.powers)
+            if (a.Item1 == b.Item1 && a.Item2 != b.Item2)
+                return false;
+
+        return A.powers.Count == B.powers.Count;
+    }
+
+    public static bool operator !=(Monom A, Monom B)
+    {
+        return !(A == B);
+    }
+
+    public int CompareTo(Monom? other)
+    {
+        if ((object?)other == null)
+            return -1;
+
+        if (other == this)
+            return 0;
+
+        return this > other ? 1 : -1;
+    }
+
+    public override string ToString()
+    {
         string result = "";
 
         if (this.coefficient != 1.0)
             result += this.coefficient.ToString();
 
-        if(this.powers.Count == 1){
-            if (this.powers[0] != 0)
-                result += $"x^{this.powers[0]}";
+        if (this.powers.Count == 1)
+        {
+            if (this.powers[0].Item2 != 0)
+                result += $"{this.powers[0].Item1}^{this.powers[0].Item2}";
 
             return result;
         }
 
-        for(int i = 0; i < this.powers.Count; i++) {
-            if (this.powers[i] != 0){
-                if(result.Length != 0)
+        for (int i = 0; i < this.powers.Count; i++)
+        {
+            if (this.powers[i].Item2 != 0)
+            {
+                if (result.Length != 0)
                     result += "*";
 
-                result += $"x{i + 1}^{this.powers[i]}";
+                result += $"{this.powers[i].Item1}^{this.powers[i].Item2}";
             }
         }
 
@@ -63,21 +175,81 @@ public class Monom {
 
         return result;
     }
-
 }
 
-public class Polynomial {
+public class Polynomial
+{
     List<Monom> monoms;
 
-    public Polynomial(List<Monom> m){
+    public Polynomial(List<Monom> m)
+    {
         this.monoms = m;
+        this.cleanup();
     }
 
-    public override string ToString(){
+    public Polynomial(Monom m)
+    {
+        this.monoms = new List<Monom>();
+        this.monoms.Add(m);
+        this.cleanup();
+    }
+
+    public Polynomial(params Monom[] args)
+    {
+        this.monoms = new List<Monom>(args);
+        this.cleanup();
+    }
+
+    public Polynomial cleanup()
+    {
+        foreach (Monom m in this.monoms)
+        {
+            m.cleanup();
+        }
+
+        this.monoms.Sort((Monom A, Monom B) => -(A.CompareTo(B)));
+
+        int i = 0;
+        while (i + 1 < this.monoms.Count)
+        {
+            if (this.monoms[i] == this.monoms[i + 1])
+            {
+                this.monoms[i] = this.monoms[i] + this.monoms[i + 1];
+                this.monoms.RemoveAt(i + 1);
+            }
+
+            if (this.monoms[i].Coefficient == 0)
+                this.monoms.RemoveAt(i);
+
+            i++;
+        }
+
+        return this;
+    }
+
+    public static Polynomial operator +(Polynomial A, Polynomial B)
+    {
+        return (new Polynomial(Utils.Concat(A.monoms, B.monoms))).cleanup();
+    }
+
+    public static Polynomial operator *(Polynomial A, Polynomial B)
+    {
+        List<Monom> l = new List<Monom>();
+
+        foreach (Monom a in A.monoms)
+        foreach (Monom b in B.monoms)
+            l.Add(a * b);
+
+        return new Polynomial(l).cleanup();
+    }
+
+    public override string ToString()
+    {
         string result = "";
 
-        for(int i = 0; i < this.monoms.Count; i++){
-            if (i > 0 && i != this.monoms.Count - 1)
+        for (int i = 0; i < this.monoms.Count; i++)
+        {
+            if (i > 0)
                 result += " + ";
             result += this.monoms[i].ToString();
         }
